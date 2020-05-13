@@ -1,0 +1,125 @@
+From 85709ac8cfe9a380963e3ff4311d66896d736b7a Mon Sep 17 00:00:00 2001
+From: Diego Ferrer <diegoferrersan@gmail.com>
+Date: Wed, 29 Apr 2020 17:17:49 -0400
+Subject: [PATCH] Create Patch File
+
+---
+ src/App.tsx   | 28 ++++++++++++++++++++++------
+ src/Graph.tsx | 20 ++++++++++++++++----
+ 2 files changed, 38 insertions(+), 10 deletions(-)
+
+diff --git a/src/App.tsx b/src/App.tsx
+index 0728518..58db90f 100755
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -6,8 +6,10 @@ import './App.css';
+ /**
+  * State declaration for <App />
+  */
++//added showGraph property in order to hide the graph until the button is pressed
+ interface IState {
+   data: ServerRespond[],
++  showGraph: boolean,
+ }
+ 
+ /**
+@@ -22,6 +24,7 @@ class App extends Component<{}, IState> {
+       // data saves the server responds.
+       // We use this state to parse data down to the child element (Graph) as element property
+       data: [],
++      showGraph: false, //Graph won't be automatically shown since this property is set to false
+     };
+   }
+ 
+@@ -29,18 +32,31 @@ class App extends Component<{}, IState> {
+    * Render Graph react component with state.data parse as property data
+    */
+   renderGraph() {
+-    return (<Graph data={this.state.data}/>)
++    if(this.state.showGraph)
++    {
++      return (<Graph data={this.state.data}/>)
++    }
++    
+   }
+ 
+   /**
+    * Get new data from server and update the state with the new data
+    */
+   getDataFromServer() {
+-    DataStreamer.getData((serverResponds: ServerRespond[]) => {
+-      // Update the state by creating a new array of data that consists of
+-      // Previous data in the state and the new data from server
+-      this.setState({ data: [...this.state.data, ...serverResponds] });
+-    });
++    let x = 0;
++    const interval = setInterval(() => {
++      DataStreamer.getData((serverResponds: ServerRespond []) => {
++        this.setState ({
++          data: serverResponds,
++          showGraph: true, //show graph once data comes back from the server to the requestor
++        });
++      });
++      x++;
++      if( x > 1000) {
++        clearInterval(interval);
++      }
++    }, 100)
++    
+   }
+ 
+   /**
+diff --git a/src/Graph.tsx b/src/Graph.tsx
+index ec1430e..c28c97c 100644
+--- a/src/Graph.tsx
++++ b/src/Graph.tsx
+@@ -14,7 +14,8 @@ interface IProps {
+  * Perspective library adds load to HTMLElement prototype.
+  * This interface acts as a wrapper for Typescript compiler.
+  */
+-interface PerspectiveViewerElement {
++//modify Perspective Viewer to inheirt the attributes of an HTMLElement
++interface PerspectiveViewerElement extends HTMLElement {
+   load: (table: Table) => void,
+ }
+ 
+@@ -32,22 +33,33 @@ class Graph extends Component<IProps, {}> {
+ 
+   componentDidMount() {
+     // Get element to attach the table from the DOM.
+-    const elem: PerspectiveViewerElement = document.getElementsByTagName('perspective-viewer')[0] as unknown as PerspectiveViewerElement;
++    const elem = document.getElementsByTagName('perspective-viewer')[0] as unknown as PerspectiveViewerElement;
+ 
++    
+     const schema = {
+       stock: 'string',
+       top_ask_price: 'float',
+       top_bid_price: 'float',
+       timestamp: 'date',
+     };
++    //I originally placed this block of code inside of the if() statement, however, placing it here seems to have made the updating on the graph quite more smooth
++    /*I had a silly error where the graph would not load because of a coma in the aggregates portion of the attribute setting*/
++    elem.setAttribute('view', 'y_line');
++      elem.setAttribute('column-pivots', '["stock"]');
++      elem.setAttribute('row-pivots', '["timestamp"]');
++      elem.setAttribute('columns', '["top_ask_price"]');
++      elem.setAttribute('aggregates', `
++        {"stock" : "distinct count",
++        "top_ask_price": "avg",
++        "top_bid_price": "avg",
++        "timestamp": "distinct count"}`); //aggregates takes care of our issue with the duplicate data
+ 
+     if (window.perspective && window.perspective.worker()) {
+       this.table = window.perspective.worker().table(schema);
+     }
+     if (this.table) {
+       // Load the `table` in the `<perspective-viewer>` DOM reference.
+-
+-      // Add more Perspective configurations here.
++       // Add more Perspective configurations here.
+       elem.load(this.table);
+     }
+   }
+-- 
+2.24.1.windows.2
+
